@@ -12,9 +12,9 @@ using namespace std;
 void readFile(vector<Process>& processes, int &numOfProcesses);
 void askUser(int &memSize, int &pageSize, int MAX_MEMORY);
 void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, int MAX_TIME, int MAX_MEMORY, int memSize, int pageSize, vector<Frames>& memMap);
-void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize);
+void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem);
 void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize, int &leftOverMem);
-void printMap(vector<Frames>& memMap, int memSize, int pageSize);
+void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem);
 void sumPage(int pageSize, int page, int& totalMemUsed, int& calls, int numOfPages);
 
 void readFile(vector<Process>& processes, int &numOfProcesses)
@@ -77,7 +77,7 @@ void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, i
   int leftOverMem = memSize;
   while(true)
   {
-    addToQueue(t, inputQueue, processes, memMap, memSize, pageSize);
+    addToQueue(t, inputQueue, processes, memMap, memSize, pageSize, leftOverMem);
     moveToMemory(memMap, inputQueue, pageSize, memSize, leftOverMem);
 
     t++;
@@ -93,7 +93,7 @@ void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, i
   }
 }
 
-void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize)
+void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem)
 {
   int count = 0;
   for(int i = 0; i < processes.size(); i++)
@@ -116,7 +116,7 @@ void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes,
         cout << inputQueue[j].pid << " ";
       }
       cout << "]\n";
-      printMap(memMap, memSize, pageSize);
+      printMap(memMap, memSize, pageSize, leftOverMem);
       count++;
     }
   }
@@ -152,26 +152,17 @@ void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageS
         frameObj.pages = round(frameObj.mem / roundPage);
         leftOverMem -= frameObj.mem;
         memMap.push_back(frameObj);
-        cout << "MM moves process " << frameObj.proc << " to memory\n";
-        printMap(memMap, memSize, pageSize);
+        cout << "\t MM moves process " << frameObj.proc << " to memory\n";
+        printMap(memMap, memSize, pageSize, leftOverMem);
         inputQueue.erase(inputQueue.begin());
       }
+      // Maybe here we can add a conditional to remove processes that are too large
+      // for the memory manager from the input queue.
     }
   }
-
-  // When we get the memory map working completley uncomment this if-statement
-  /*if(inputQueue.size() != 0)
-  {
-    inputQueue.erase(inputQueue.begin());
-  }*/
-  // This erase statement is for testing purposes it will crash the program after the first
-  // two processes, which is deliberate. If we went with the above if-statement it would solve the
-  // crashing issue, but will infinite loop instead making it difficult to test the memory map.
-  // This is due to the fact that the memory manager has a lot of "moving parts" that need to
-  // work properly in order for the program to not break.
 }
 
-void printMap(vector<Frames>& memMap, int memSize, int pageSize)
+void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem)
 {
   int totalMemUsed = 0;
   int calls = 0;
@@ -191,7 +182,10 @@ void printMap(vector<Frames>& memMap, int memSize, int pageSize)
         cout << " Process " << memMap[i].proc << ", Page " << j << endl;
       }
     }
-    cout << "\t\t" << totalMemUsed << " - " << (memSize - 1) << ": Free frames(s)\n";
+    if(leftOverMem != 0)
+    {
+      cout << "\t\t" << totalMemUsed << " - " << (memSize - 1) << ": Free frames(s)\n";
+    }
   }
 }
 

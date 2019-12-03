@@ -6,6 +6,8 @@ struct Frames
   int mem;
   int pages;
   int proc;
+  int highEnd;
+  int lowEnd;
 };
 
 #endif
