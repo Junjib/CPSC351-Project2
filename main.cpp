@@ -24,6 +24,27 @@ int main()
   askUser(memSize, pageSize, MAX_MEMORY);
   /*cout << "memSize: " << memSize << endl;
   cout << "pageSize: " << pageSize << endl;*/
+  int pageSizePlus = 0;
+  if(pageSize == 1)
+  {
+    pageSizePlus = 100;
+  }
+  else if(pageSize == 2)
+  {
+    pageSizePlus = 200;
+  }
+  else if(pageSize == 3)
+  {
+    pageSizePlus = 400;
+  }
+  float memoryMapSize = floor(memSize / pageSizePlus);
+
+  sumPage(memMap, pageSize, memoryMapSize);
+  /*for(int i = 0; i < memMap.size(); i++)
+  {
+      cout << memMap[i].lowEnd << " - " << memMap[i].highEnd << endl;
+  }*/
+
 
   mainLoop(t, inputQueue, processes, MAX_TIME, MAX_MEMORY, memSize, pageSize, memMap);
 

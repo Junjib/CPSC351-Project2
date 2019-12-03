@@ -4,10 +4,11 @@
 struct Frames
 {
   int mem;
-  int pages;
-  int proc;
+  int page;
+  int proc = 0;
   int highEnd;
   int lowEnd;
+  int validBit = 0;
 };
 
 #endif
