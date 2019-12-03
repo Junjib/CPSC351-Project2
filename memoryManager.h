@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <vector>
 #include <queue>
@@ -12,7 +13,7 @@ void readFile(vector<Process>& processes, int &numOfProcesses);
 void askUser(int &memSize, int &pageSize, int MAX_MEMORY);
 void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, int MAX_TIME, int MAX_MEMORY, int memSize, int pageSize, vector<Frames>& memMap);
 void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize);
-void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize);
+void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize, int &leftOverMem);
 void printMap(vector<Frames>& memMap, int memSize, int pageSize);
 void sumPage(int pageSize, int page, int& totalMemUsed, int& calls, int numOfPages);
 
@@ -73,10 +74,11 @@ void askUser(int &memSize, int &pageSize, int MAX_MEMORY)
 void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, int MAX_TIME, int MAX_MEMORY, int memSize, int pageSize, vector<Frames>& memMap)
 {
   int queueCounter = 0;
+  int leftOverMem = memSize;
   while(true)
   {
     addToQueue(t, inputQueue, processes, memMap, memSize, pageSize);
-    moveToMemory(memMap, inputQueue, pageSize, memSize);
+    moveToMemory(memMap, inputQueue, pageSize, memSize, leftOverMem);
 
     t++;
     if(t > MAX_TIME)
@@ -120,10 +122,10 @@ void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes,
   }
 }
 
-void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize)
+void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize, int &leftOverMem)
 {
   Frames frameObj;
-  float pageTest = 0.0;
+  float roundPage = 0.0;
 
   if(pageSize == 1)
   {
@@ -137,15 +139,26 @@ void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageS
   {
     pageSize = 400;
   }
-  pageTest = pageSize;
+  roundPage = pageSize;
 
-  frameObj.proc = inputQueue[0].pid;
-  frameObj.mem = inputQueue[0].size;
-  frameObj.pages = round(frameObj.mem / pageTest);
+  if(inputQueue.size() != 0)
+  {
+    for(int i = 0; i < inputQueue.size(); i++)
+    {
+      if(inputQueue[i].size <= memSize && inputQueue[i].size <= leftOverMem)
+      {
+        frameObj.proc = inputQueue[i].pid;
+        frameObj.mem = inputQueue[i].size;
+        frameObj.pages = round(frameObj.mem / roundPage);
+        leftOverMem -= frameObj.mem;
+        memMap.push_back(frameObj);
+        cout << "MM moves process " << frameObj.proc << " to memory\n";
+        printMap(memMap, memSize, pageSize);
+        inputQueue.erase(inputQueue.begin());
+      }
+    }
+  }
 
-  memMap.push_back(frameObj);
-  cout << "MM moves process " << frameObj.proc << " to memory\n";
-  printMap(memMap, memSize, pageSize);
   // When we get the memory map working completley uncomment this if-statement
   /*if(inputQueue.size() != 0)
   {
@@ -156,7 +169,6 @@ void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageS
   // crashing issue, but will infinite loop instead making it difficult to test the memory map.
   // This is due to the fact that the memory manager has a lot of "moving parts" that need to
   // work properly in order for the program to not break.
-  inputQueue.erase(inputQueue.begin());
 }
 
 void printMap(vector<Frames>& memMap, int memSize, int pageSize)
