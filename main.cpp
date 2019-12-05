@@ -15,15 +15,9 @@ int main()
   vector<Frames> memMap;
 
   readFile(processes, numOfProcesses);
-
-  /*for(int i = 0; i < processes.size(); i++)
-  {
-    cout << processes[i].pid << " " << processes[i].aTime << endl;
-  }*/
-
   askUser(memSize, pageSize, MAX_MEMORY);
-  /*cout << "memSize: " << memSize << endl;
-  cout << "pageSize: " << pageSize << endl;*/
+  cleanUp(processes, memSize);
+
   int pageSizePlus = 0;
   if(pageSize == 1)
   {
@@ -40,12 +34,7 @@ int main()
   float memoryMapSize = floor(memSize / pageSizePlus);
 
   sumPage(memMap, pageSize, memoryMapSize);
-  /*for(int i = 0; i < memMap.size(); i++)
-  {
-      cout << memMap[i].lowEnd << " - " << memMap[i].highEnd << endl;
-  }*/
-
-
+  cout << "\n\n";
   mainLoop(t, inputQueue, processes, MAX_TIME, MAX_MEMORY, memSize, pageSize, memMap);
 
   return 0;

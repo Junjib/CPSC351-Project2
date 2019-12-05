@@ -4,6 +4,8 @@
 #include <queue>
 #include <fstream>
 #include <cmath>
+#include <iomanip>
+#include <string>
 #include "process.h"
 #include "frames.h"
 
@@ -12,18 +14,33 @@ using namespace std;
 void readFile(vector<Process>& processes, int &numOfProcesses);
 void askUser(int &memSize, int &pageSize, int MAX_MEMORY);
 void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, int MAX_TIME, int MAX_MEMORY, int memSize, int pageSize, vector<Frames>& memMap);
-void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem);
-void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize, int &leftOverMem);
-void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem, int pages);
+void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem, int& queueCounter);
+void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, vector<Process>& processes, int pageSize, int memSize, int &leftOverMem, int &t);
+void printMap(vector<Frames>& memMap, int memSize, int pageSize);
 void sumPage2(vector<Frames>& memMap, int pageSize, int memoryMapSize);
+void processComplete(vector<Frames>& memMap, vector<Process>& processes, vector<Process>& inputQueue, int &t, int memSize, int pageSize, int &leftOverMem, int &queueCounter);
+void computeTurnAround(vector<Process>& processes);
+void cleanUp(vector<Process>& processes, int memSize);
 
 void readFile(vector<Process>& processes, int &numOfProcesses)
 {
   ifstream read;
   int pid = 0, aTime = 0, cTime = 0, size = 0, discard = 0, num = 0;
   Process p;
+  string fileName = "";
 
-  read.open("in1.txt");
+  cout << "Enter a filename: ";
+  cin >> fileName;
+
+  read.open(fileName);
+  while(!read.is_open())
+  {
+    read.close();
+    cout << "File does not exist\n";
+    cout << "Enter a filename: ";
+    cin >> fileName;
+    read.open(fileName);
+  }
   read >> numOfProcesses;
   while(!read.eof())
   {
@@ -77,8 +94,15 @@ void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, i
   int leftOverMem = memSize;
   while(true)
   {
-    addToQueue(t, inputQueue, processes, memMap, memSize, pageSize, leftOverMem);
-    moveToMemory(memMap, inputQueue, pageSize, memSize, leftOverMem);
+    addToQueue(t, inputQueue, processes, memMap, memSize, pageSize, leftOverMem, queueCounter);
+    moveToMemory(memMap, inputQueue, processes, pageSize, memSize, leftOverMem, t);
+    processComplete(memMap, processes, inputQueue, t, memSize, pageSize, leftOverMem, queueCounter);
+
+    if(queueCounter == processes.size())
+    {
+      computeTurnAround(processes);
+      break;
+    }
 
     t++;
     if(t > MAX_TIME)
@@ -86,17 +110,12 @@ void mainLoop(int &t, vector<Process>& inputQueue, vector<Process>& processes, i
       cout << "ERROR: max time exceeded!\n";
       break;
     }
-    if(inputQueue.size() == processes.size())
-    {
-      break;
-    }
   }
 }
 
-void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem)
+void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes, vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem, int& queueCounter)
 {
   int count = 0;
-  int crap = 0;
   for(int i = 0; i < processes.size(); i++)
   {
     if(t == processes[i].aTime)
@@ -117,19 +136,19 @@ void addToQueue(int &t, vector<Process>& inputQueue, vector<Process>& processes,
         cout << inputQueue[j].pid << " ";
       }
       cout << "]\n";
-      printMap(memMap, memSize, pageSize, leftOverMem, crap);
+      printMap(memMap, memSize, pageSize);
       count++;
     }
   }
 }
 
-void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageSize, int memSize, int &leftOverMem)
+void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, vector<Process>& processes, int pageSize, int memSize, int &leftOverMem, int &t)
 {
   Frames frameObj;
-  float roundPage = 0.0;
-  int pages;
-  int counter = 0;
-  int pageNum = 1;
+  float roundPage = 0.0, pages;
+  int counter = 0, pageNum = 1;
+  int inputSize = inputQueue.size();
+  int inputPos = 0;
 
   if(pageSize == 1)
   {
@@ -147,41 +166,52 @@ void moveToMemory(vector<Frames>& memMap, vector<Process>& inputQueue, int pageS
 
   if(inputQueue.size() != 0)
   {
-    for(int i = 0; i < inputQueue.size(); i++)
+    for(int i = 0; i < inputSize; ++i)
     {
-      if(inputQueue[i].size <= memSize && inputQueue[i].size <= leftOverMem)
+      if(inputQueue[i].size <= leftOverMem)
       {
         pages = ceil(inputQueue[i].size / roundPage);
+        counter = 0;
+        pageNum = 0;
+        leftOverMem -= (roundPage * pages);
 
-        leftOverMem -= inputQueue[i].size;
         for(int j = 0; j < memMap.size(); j++)
         {
           if(memMap[j].validBit != 1 && counter != pages)
           {
+            counter++;
+            pageNum++;
             memMap[j].proc = inputQueue[i].pid;
             memMap[j].page = pageNum;
             memMap[j].validBit = 1;
-            counter++;
-            pageNum++;
-          }
-          if(counter == pages)
-          {
-            cout << "\t MM moves process " << inputQueue[i].pid << " to memory\n";
-            printMap(memMap, memSize, pageSize, leftOverMem, pages);
-            break;
           }
         }
-        inputQueue.erase(inputQueue.begin());
+        if(counter == pages)
+        {
+          cout << "\t MM moves process " << inputQueue[i].pid << " to memory\n";
+          printMap(memMap, memSize, pageSize);
+        }
+        for(int k = 0; k < processes.size(); k++)
+        {
+          if(inputQueue[i].pid == processes[k].pid)
+          {
+            processes[k].tMem = t;
+            processes[k].active = 1;
+          }
+        }
+        inputQueue.erase(inputQueue.begin() + inputPos);
       }
-      // Maybe here we can add a conditional to remove processes that are too large
-      // for the memory manager from the input queue.
+      else
+      {
+        inputPos++;
+      }
     }
   }
 }
 
-void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMem, int pages)
+void printMap(vector<Frames>& memMap, int memSize, int pageSize)
 {
-  int emptyCounter = 0, freeFrames = 0;
+  int totalFreeHigh = 0, totalFreeLow = 0, lowCount = 0;
 
   if(pageSize == 1)
   {
@@ -195,7 +225,6 @@ void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMe
   {
     pageSize = 400;
   }
-  freeFrames = pageSize;
 
   cout << "\t Memory map:\n";
   for(int i = 0; i < memMap.size(); i++)
@@ -204,13 +233,23 @@ void printMap(vector<Frames>& memMap, int memSize, int pageSize, int &leftOverMe
     {
       cout << "\t\t" <<  memMap[i].lowEnd << " - " << memMap[i].highEnd << ":";
       cout << " Process " << memMap[i].proc << ", Page " << memMap[i].page << endl;
-      emptyCounter++;
     }
-  }
-  if(emptyCounter != memMap.size())
-  {
-    freeFrames = freeFrames * emptyCounter;
-    cout << "\t\t" << freeFrames << " - " << (memSize - 1) << ": Free frames(s)\n";
+    else if(memMap[i].validBit != 1)
+    {
+      if(lowCount == 0)
+      {
+        totalFreeLow = memMap[i].lowEnd;
+        lowCount = 1;
+      }
+      while(memMap[i].validBit != 1 && i < memMap.size())
+      {
+        totalFreeHigh = memMap[i].highEnd;
+        i++;
+      }
+      i--;
+      lowCount = 0;
+      cout << "\t\t" << totalFreeLow << " - " << totalFreeHigh << ": Free frames(s)\n";
+    }
   }
 }
 
@@ -236,5 +275,68 @@ void sumPage(vector<Frames>& memMap, int pageSize, int memoryMapSize)
     frameObj.highEnd = ((pageSize * i) - 1);
     frameObj.lowEnd = (frameObj.highEnd - pageSize) + 1;
     memMap.push_back(frameObj);
+  }
+}
+
+void processComplete(vector<Frames>& memMap, vector<Process>& processes, vector<Process>& inputQueue, int &t, int memSize, int pageSize, int &leftOverMem, int &queueCounter)
+{
+  int counter = 0;
+  for(int i = 0; i < processes.size(); i++)
+  {
+    if(processes[i].active == 1 && (processes[i].cTime + processes[i].tMem) == t)
+    {
+      processes[i].active = 0;
+      queueCounter++;
+      processes[i].totalCompletionTime = (processes[i].cTime + processes[i].tMem);
+      leftOverMem += processes[i].size;
+      if(counter == 0)
+      {
+        cout << "t = " << t << ": Process " << processes[i].pid << " completes\n";
+        counter++;
+      }
+      else
+      {
+        cout << "\t  Process " << processes[i].pid << " completes\n";
+      }
+      for(int j = 0; j < memMap.size(); j++)
+      {
+        if(memMap[j].proc == processes[i].pid)
+        {
+          memMap[j].validBit = -1;
+        }
+      }
+      printMap(memMap, memSize, pageSize);
+    }
+  }
+  moveToMemory(memMap, inputQueue, processes, pageSize, memSize, leftOverMem, t);
+}
+
+void computeTurnAround(vector<Process>& processes)
+{
+  float total = 0, procTurnAround = 0;
+
+  for(int i = 0; i < processes.size(); i++)
+  {
+    procTurnAround = (processes[i].totalCompletionTime - processes[i].aTime);
+    total += procTurnAround;
+  }
+  cout << "Average turnaround: " << fixed << setprecision(2) << (total / processes.size());
+  cout << " (" << static_cast<int>(total) << " / " << processes.size() << ")\n";
+}
+
+void cleanUp(vector<Process>& processes, int memSize)
+{
+  int pos = 0;
+  int vSize = processes.size();
+  for(int i = 0; i < vSize; i++)
+  {
+    if(processes[i].size > memSize)
+    {
+      processes.erase(processes.begin() + pos);
+    }
+    else
+    {
+      pos++;
+    }
   }
 }

@@ -7,6 +7,9 @@ struct Process
   int size;
   int cTime;
   int pid;
+  int tMem;
+  int active = 0;
+  int totalCompletionTime = 0;
 };
 
 #endif
